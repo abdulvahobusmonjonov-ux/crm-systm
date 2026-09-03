@@ -12,6 +12,10 @@ const DASHBOARD_HOME_PATH = "/dashboard";
 // oddiy xodim (operator, reception va h.k.) manzilni to'g'ridan-to'g'ri yozib kirsa ham bloklanadi.
 const ADMIN_ONLY_PREFIXES = ["/settings", "/users", "/permissions", "/logs"];
 
+// Plain startsWith() would also match "/students"/"/teachers" (distinct admin list pages) against
+// the "/student"/"/teacher" portal prefixes — require an exact match or a "/" boundary after it.
+const pathIs = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(prefix + "/");
+
 const isAdminRole = (role: string) => role === "SUPER_ADMIN" || role === "ADMIN";
 // Sessions issued before the "student" account type existed have no accountType in their
 // JWT yet — treat that as "staff" so already-logged-in admin/teacher sessions keep working.
@@ -51,7 +55,7 @@ export const authConfig: NextAuthConfig = {
         if (nextUrl.pathname === "/login") {
           return Response.redirect(new URL(landingPath(user), nextUrl));
         }
-        if (nextUrl.pathname.startsWith(TEACHER_PREFIX) && !user.isTeacher && user.role !== "MENTOR" && !isAdminRole(user.role)) {
+        if (pathIs(nextUrl.pathname, TEACHER_PREFIX) && !user.isTeacher && user.role !== "MENTOR" && !isAdminRole(user.role)) {
           return Response.redirect(new URL("/dashboard", nextUrl));
         }
         // Admin's own home page — a teacher/mentor (who isn't also an admin) has no business
@@ -60,18 +64,18 @@ export const authConfig: NextAuthConfig = {
         if (nextUrl.pathname === DASHBOARD_HOME_PATH && (user.isTeacher || user.role === "MENTOR") && !isAdminRole(user.role)) {
           return Response.redirect(new URL(landingPath(user), nextUrl));
         }
-        if (nextUrl.pathname.startsWith(RECEPTION_PREFIX) && user.role !== "RECEPTION" && !isAdminRole(user.role)) {
+        if (pathIs(nextUrl.pathname, RECEPTION_PREFIX) && user.role !== "RECEPTION" && !isAdminRole(user.role)) {
           return Response.redirect(new URL("/dashboard", nextUrl));
         }
-        if (nextUrl.pathname.startsWith(FINANCE_PREFIX) && user.role !== "ACCOUNTANT" && !isAdminRole(user.role)) {
+        if (pathIs(nextUrl.pathname, FINANCE_PREFIX) && user.role !== "ACCOUNTANT" && !isAdminRole(user.role)) {
           return Response.redirect(new URL("/dashboard", nextUrl));
         }
         // Students' session id is a Lead id, not a User id — confine them to their own
         // portal so they never reach staff pages/APIs that assume session.user.id is a User.
-        if (isStudent(user) && !nextUrl.pathname.startsWith(STUDENT_PREFIX) && !nextUrl.pathname.startsWith("/api/student")) {
+        if (isStudent(user) && !pathIs(nextUrl.pathname, STUDENT_PREFIX) && !nextUrl.pathname.startsWith("/api/student")) {
           return Response.redirect(new URL("/student/dashboard", nextUrl));
         }
-        if (nextUrl.pathname.startsWith(STUDENT_PREFIX) && !isStudent(user)) {
+        if (pathIs(nextUrl.pathname, STUDENT_PREFIX) && !isStudent(user)) {
           return Response.redirect(new URL(landingPath(user), nextUrl));
         }
         if (

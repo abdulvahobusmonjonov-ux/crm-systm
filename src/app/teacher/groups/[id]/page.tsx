@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ArrowLeft, MapPin, BookOpen } from "lucide-react";
 import { MonthPicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,10 @@ function ym(d: Date) {
 
 export default function TeacherGroupPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: groupId } = use(params);
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const isAdminRole = role === "SUPER_ADMIN" || role === "ADMIN";
+  const backHref = isAdminRole ? "/timetable" : "/teacher/dashboard";
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -59,7 +64,7 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
   return (
     <div className="min-h-screen bg-[#F5F6FA] dark:bg-gray-950 p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-5" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="flex items-center gap-3">
-        <Link href="/teacher/dashboard" className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 transition-colors">
+        <Link href={backHref} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="min-w-0">

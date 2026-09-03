@@ -13,9 +13,17 @@ export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [leads, payments] = await Promise.all([
+  const [leads, payments, students] = await Promise.all([
     db.lead.findMany({ select: { source: true, status: true, assignedToId: true, assignedTo: { select: { fullName: true } } } }),
     db.payment.findMany({ select: { amount: true, forMonth: true, paidAt: true, lead: { select: { source: true, assignedToId: true } } } }),
+    // For join/leave tracking — students ever enrolled, with the group/teacher they studied under.
+    db.lead.findMany({
+      where: { OR: [{ enrolledAt: { not: null } }, { isArchived: true }] },
+      select: {
+        status: true, isArchived: true, enrolledAt: true, updatedAt: true,
+        group: { select: { id: true, name: true, teacherId: true, teacher: { select: { fullName: true } } } },
+      },
+    }),
   ]);
 
   // By source
@@ -77,5 +85,27 @@ export async function GET() {
     revenue: payments.reduce((a, p) => a + Number(p.amount || 0), 0),
   };
 
-  return NextResponse.json({ bySource, byManager, monthly, forecast, totals });
+  // Join/leave per month (last 6 months) — "joined" = enrolledAt falls in that month;
+  // "left" = archived (dropped out) and last touched (updatedAt) in that month. There's no
+  // dedicated "leftAt" column, so isArchived+updatedAt is the closest available signal.
+  const ym = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+  const monthlyJoinLeave = months.map((m) => ({
+    month: m,
+    joined: students.filter((s) => s.enrolledAt && ym(new Date(s.enrolledAt)) === m).length,
+    left: students.filter((s) => s.isArchived && ym(new Date(s.updatedAt)) === m).length,
+  }));
+
+  // By teacher — who currently has how many enrolled students, and how many of their
+  // past students left, so it's clear which teacher's students are dropping out.
+  const teacherMap: Record<string, { teacherId: string; teacherName: string; currentStudents: number; leftStudents: number }> = {};
+  for (const s of students) {
+    const g = s.group;
+    if (!g?.teacherId) continue;
+    teacherMap[g.teacherId] ||= { teacherId: g.teacherId, teacherName: g.teacher?.fullName || "Noma'lum", currentStudents: 0, leftStudents: 0 };
+    if (s.status === "ENROLLED" && !s.isArchived) teacherMap[g.teacherId].currentStudents++;
+    if (s.isArchived) teacherMap[g.teacherId].leftStudents++;
+  }
+  const byTeacherRetention = Object.values(teacherMap).sort((a, b) => b.leftStudents - a.leftStudents);
+
+  return NextResponse.json({ bySource, byManager, monthly, forecast, totals, monthlyJoinLeave, byTeacherRetention });
 }

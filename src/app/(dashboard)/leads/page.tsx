@@ -68,8 +68,9 @@ export default function LeadsPage() {
 
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || "",
-    status: "", stageId: "", courseId: "", source: "", assignedToId: "",
-    dateFrom: "", dateTo: "", timePreference: "", archived: "", frozen: "", page: 1,
+    status: searchParams.get("status") || "", stageId: "", courseId: "", source: "", assignedToId: "",
+    dateFrom: searchParams.get("dateFrom") || "", dateTo: searchParams.get("dateTo") || "",
+    timePreference: "", archived: "", frozen: searchParams.get("frozen") || "", page: 1,
   });
   const [inputSearch, setInputSearch] = useState(searchParams.get("search") || "");
 

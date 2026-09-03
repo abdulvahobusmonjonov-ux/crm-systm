@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId");
   const groupId = searchParams.get("groupId");
-  const month = searchParams.get("month"); // YYYY-MM
+  const month = searchParams.get("month"); // YYYY-MM (which tuition month a payment covers)
+  const from = searchParams.get("from"); // ISO date — daily/monthly/yearly period filter on paidAt
+  const to = searchParams.get("to");
   const q = searchParams.get("q");
 
   const page = parseInt(searchParams.get("page") || "1");
@@ -35,12 +37,21 @@ export async function GET(req: NextRequest) {
   if (leadId) where.leadId = leadId;
   if (groupId) where.groupId = groupId;
   if (month) where.forMonth = month;
+  if (from || to) {
+    where.paidAt = {};
+    if (from) where.paidAt.gte = new Date(from);
+    if (to) where.paidAt.lte = new Date(to);
+  }
   if (q) where.lead = { OR: [{ fullName: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] };
 
   const now = new Date();
   const tz = 5 * 3600 * 1000;
   const t = new Date(now.getTime() + tz);
   const monthStr = `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
+  // Always the real current calendar month's total — independent of the list's own filters,
+  // so the "Bu oy tushum" KPI stays meaningful even while the table is filtered to another period.
+  const monthStart = new Date(`${monthStr}-01T00:00:00.000Z`);
+  const monthEnd = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 1));
 
   const [payments, total, allAgg, monthAgg] = await Promise.all([
     db.payment.findMany({
@@ -65,7 +76,7 @@ export async function GET(req: NextRequest) {
     }),
     db.payment.count({ where }),
     db.payment.aggregate({ _sum: { amount: true }, _count: true, where }),
-    db.payment.aggregate({ _sum: { amount: true }, where: { ...where, forMonth: month || monthStr } }),
+    db.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: monthStart, lt: monthEnd } } }),
   ]);
 
   return NextResponse.json({
@@ -78,7 +89,7 @@ export async function GET(req: NextRequest) {
       total: Number(allAgg._sum.amount || 0),
       count: allAgg._count,
       monthTotal: Number(monthAgg._sum.amount || 0),
-      month: month || monthStr,
+      month: monthStr,
     },
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -52,6 +52,8 @@ const sectionTitleCls = "text-[14px] font-semibold text-gray-900 dark:text-white
 
 export default function NewLeadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isStudentMode = searchParams.get("status") === "ENROLLED";
   const [courses, setCourses] = useState<Course[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -67,7 +69,7 @@ export default function NewLeadPage() {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(schema) as any,
-    defaultValues: { timePreference: "FLEXIBLE", status: "NEW", source: "OTHER" },
+    defaultValues: { timePreference: "FLEXIBLE", status: isStudentMode ? "ENROLLED" : "NEW", source: "OTHER" },
   });
 
   const phone = watch("phone");
@@ -130,8 +132,8 @@ export default function NewLeadPage() {
     });
     if (res.ok) {
       const lead = await res.json();
-      toast.success("Lid muvaffaqiyatli qo'shildi!");
-      router.push(`/leads/${lead.id}`);
+      toast.success(isStudentMode ? "Talaba muvaffaqiyatli qo'shildi!" : "Lid muvaffaqiyatli qo'shildi!");
+      router.push(isStudentMode ? "/students" : `/leads/${lead.id}`);
     } else {
       const err = await res.json();
       if (err.error === "duplicate") {
@@ -151,14 +153,16 @@ export default function NewLeadPage() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
-            href="/leads"
+            href={isStudentMode ? "/students" : "/leads"}
             className="p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 text-gray-500 hover:text-[#5E2CA5] hover:border-[#5E2CA5]/30 transition-colors shadow-sm"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Yangi lid</h1>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Potentsial o&apos;quvchi ma&apos;lumotlarini kiriting</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{isStudentMode ? "Yangi talaba" : "Yangi lid"}</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
+              {isStudentMode ? "Yangi o'quvchi ma'lumotlarini kiriting" : "Potentsial o'quvchi ma'lumotlarini kiriting"}
+            </p>
           </div>
         </div>
 
@@ -377,7 +381,7 @@ export default function NewLeadPage() {
 
           {/* Footer buttons */}
           <div className="flex justify-end gap-3 pb-6">
-            <Link href="/leads">
+            <Link href={isStudentMode ? "/students" : "/leads"}>
               <button
                 type="button"
                 className="px-5 py-2.5 rounded-xl text-[13px] font-medium border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors bg-white dark:bg-gray-900"
@@ -390,7 +394,7 @@ export default function NewLeadPage() {
               disabled={saving}
               className="px-6 py-2.5 rounded-xl text-[13px] font-semibold bg-[#5E2CA5] hover:bg-[#4a2280] text-white shadow-sm transition-colors disabled:opacity-60"
             >
-              {saving ? "Saqlanmoqda..." : "Lid qo'shish"}
+              {saving ? "Saqlanmoqda..." : isStudentMode ? "Talaba qo'shish" : "Lid qo'shish"}
             </button>
           </div>
         </form>

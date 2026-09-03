@@ -5,6 +5,7 @@ export interface DebtorEntry {
   fullName: string;
   phone: string;
   group: string | null;
+  room: string | null;
   course: string | null;
   courseColor: string | null;
   required: number;
@@ -42,7 +43,7 @@ export async function getDebtors(month?: string | null): Promise<DebtorsResult> 
       fullName: true,
       phone: true,
       course: { select: { name: true, price: true, color: true } },
-      group: { select: { id: true, name: true } },
+      group: { select: { id: true, name: true, room: true } },
     },
     orderBy: { fullName: "asc" },
   });
@@ -76,6 +77,7 @@ export async function getDebtors(month?: string | null): Promise<DebtorsResult> 
         fullName: s.fullName,
         phone: s.phone,
         group: s.group?.name ?? null,
+        room: s.group?.room ?? null,
         course: s.course?.name ?? null,
         courseColor: s.course?.color ?? null,
         required,

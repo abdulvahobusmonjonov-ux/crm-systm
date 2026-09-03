@@ -7,6 +7,9 @@ import { Bell, Check, Clock, X, Phone, Plus } from "lucide-react";
 import { formatDateTime, phoneToTel } from "@/lib/utils";
 import { addMinutes, addDays, isSameDay, format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Modal, ModalPrimaryButton, ModalSecondaryButton } from "@/components/ui/modal";
+
+interface LeadOpt { id: string; fullName: string; phone: string; }
 
 interface Reminder {
   id: string; title: string; description: string | null;
@@ -41,6 +44,7 @@ export default function RemindersPage() {
   const [data, setData] = useState<ReminderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>("today");
+  const [showAdd, setShowAdd] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/reminders");
@@ -97,7 +101,7 @@ export default function RemindersPage() {
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">{data?.totalToday || 0} ta bugungi eslatma</p>
         </div>
         <button
-          onClick={() => toast.info("Eslatma qo'shish uchun lid sahifasiga o'ting")}
+          onClick={() => setShowAdd(true)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium bg-[#5E2CA5] hover:bg-[#4a2280] text-white shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" /> Yangi eslatma
@@ -223,6 +227,121 @@ export default function RemindersPage() {
           </div>
         )}
       </div>
+
+      {showAdd && (
+        <AddReminderModal
+          onClose={() => setShowAdd(false)}
+          onSaved={() => { setShowAdd(false); load(); }}
+        />
+      )}
     </div>
+  );
+}
+
+function AddReminderModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [leadQ, setLeadQ] = useState("");
+  const [leadResults, setLeadResults] = useState<LeadOpt[]>([]);
+  const [lead, setLead] = useState<LeadOpt | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [remindAt, setRemindAt] = useState(format(addMinutes(new Date(), 30), "yyyy-MM-dd'T'HH:mm"));
+  const [notifyTelegram, setNotifyTelegram] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (lead || leadQ.length < 1) { setLeadResults([]); return; }
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/leads?search=${encodeURIComponent(leadQ)}&limit=8`);
+      setLeadResults((await res.json()).leads || []);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [leadQ, lead]);
+
+  const save = async () => {
+    if (!lead) { toast.error("O'quvchi/lidni tanlang"); return; }
+    if (!title.trim()) { toast.error("Sarlavhani kiriting"); return; }
+    if (!remindAt) { toast.error("Vaqtni tanlang"); return; }
+    setSaving(true);
+    const res = await fetch("/api/reminders", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId: lead.id, title: title.trim(), description: description.trim() || undefined,
+        remindAt, notifyBrowser: true, notifyTelegram,
+      }),
+    });
+    setSaving(false);
+    if (res.ok) { toast.success("Eslatma qo'shildi"); onSaved(); }
+    else toast.error("Saqlab bo'lmadi");
+  };
+
+  const fieldCls = "w-full px-3 py-2 text-[13px] border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5E2CA5]/30 focus:border-[#5E2CA5]/50 transition";
+  const labelCls = "block text-[11px] font-medium text-gray-400 dark:text-gray-500 mb-1.5";
+
+  return (
+    <Modal
+      title="Yangi eslatma"
+      onClose={onClose}
+      footer={
+        <>
+          <ModalPrimaryButton onClick={save} loading={saving}>Saqlash</ModalPrimaryButton>
+          <ModalSecondaryButton onClick={onClose}>Bekor qilish</ModalSecondaryButton>
+        </>
+      }
+    >
+      {/* Lead picker */}
+      <div className="relative">
+        <label className={labelCls}>Kimga (lid / o&apos;quvchi)</label>
+        {lead ? (
+          <div className="flex items-center justify-between px-3 py-2 rounded-xl border border-[#5E2CA5]/30 bg-[#5E2CA5]/5 dark:bg-[#5E2CA5]/10">
+            <div>
+              <p className="text-[13px] font-medium text-gray-900 dark:text-white">{lead.fullName}</p>
+              <p className="text-[11px] text-gray-400 font-mono">{lead.phone}</p>
+            </div>
+            <button onClick={() => { setLead(null); setLeadQ(""); }} className="p-1 text-gray-400 hover:text-red-600 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <input
+              value={leadQ} onChange={e => setLeadQ(e.target.value)}
+              placeholder="Ism yoki telefon bo'yicha qidiring..."
+              className={fieldCls}
+            />
+            {leadResults.length > 0 && (
+              <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                {leadResults.map(l => (
+                  <button key={l.id} onClick={() => { setLead(l); setLeadResults([]); }}
+                    className="w-full text-left px-3 py-2 text-[13px] hover:bg-gray-50 dark:hover:bg-white/5 transition-colors border-b border-gray-50 dark:border-white/5 last:border-0">
+                    <span className="font-medium text-gray-900 dark:text-white">{l.fullName}</span>{" "}
+                    <span className="text-gray-400 font-mono">{l.phone}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div>
+        <label className={labelCls}>Sarlavha</label>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Qo'ng'iroq qilish" className={fieldCls} />
+      </div>
+
+      <div>
+        <label className={labelCls}>Izoh (ixtiyoriy)</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className={fieldCls} />
+      </div>
+
+      <div>
+        <label className={labelCls}>Qachon</label>
+        <input type="datetime-local" value={remindAt} onChange={e => setRemindAt(e.target.value)} className={fieldCls} />
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" checked={notifyTelegram} onChange={e => setNotifyTelegram(e.target.checked)} className="w-4 h-4 accent-[#5E2CA5]" />
+        <span className="text-[13px] text-gray-600 dark:text-gray-300">Telegram orqali ham xabar berilsin</span>
+      </label>
+    </Modal>
   );
 }

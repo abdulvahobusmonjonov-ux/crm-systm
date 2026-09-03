@@ -221,8 +221,12 @@ export const PERMISSION_CATALOG: PermissionDef[] = [
     ["edit_profile", "Profil ma'lumotini o'zgartirish"],
   ]),
 
-  ...mod("sms_messages", "SMS / Xabarlar", "planned", [
+  // send_sms is enforced today (qarzdorlar reminder SMS, /api/leads/[id]/sms) — the other two
+  // describe a dedicated SMS/Messages admin section that doesn't exist yet.
+  ...mod("sms_messages", "SMS / Xabarlar", "ready", [
     ["send_sms", "SMS yuborish"],
+  ]),
+  ...mod("sms_messages", "SMS / Xabarlar", "planned", [
     ["sms_access", "SMS bo'limiga kirish"],
     ["messages_access", "Xabarlar bo'limiga kirish"],
   ]),

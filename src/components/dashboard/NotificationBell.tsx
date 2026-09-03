@@ -10,7 +10,7 @@ interface Reminder {
   title: string;
   remindAt: string;
   status: string;
-  lead: { fullName: string };
+  lead: { id: string; fullName: string };
 }
 
 interface AuditLogEntry {
@@ -157,7 +157,7 @@ export default function NotificationBell() {
                   return (
                     <Link
                       key={r.id}
-                      href="/reminders"
+                      href={r.lead?.id ? `/leads/${r.lead.id}` : "/reminders"}
                       onClick={() => setOpen(false)}
                       className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 border-b border-gray-50 dark:border-white/5 last:border-0 transition-colors"
                     >

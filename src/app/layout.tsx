@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { SessionProvider } from "next-auth/react";
 import SessionRoleSync from "@/components/shared/SessionRoleSync";
+import { auth } from "@/lib/auth";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -31,14 +32,20 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Passed to SessionProvider below so the very first client render already knows who's
+  // logged in — without this, useSession() starts as unauthenticated on the client (while
+  // server-rendered HTML used the real session), and anything gated on it (e.g. Sidebar's
+  // role-based menu items) mismatches between server and client, triggering a hydration error.
+  const session = await auth();
+
   return (
     <html lang="uz" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={`${inter.variable} font-sans antialiased bg-gray-50 dark:bg-gray-950`}>
-        <SessionProvider>
+        <SessionProvider session={session}>
           <SessionRoleSync />
           {children}
           <Toaster position="top-right" richColors closeButton />

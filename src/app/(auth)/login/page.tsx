@@ -85,9 +85,13 @@ export default function LoginPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-[#08070d] flex items-center justify-center p-4 overflow-hidden"
+      className="relative min-h-screen bg-gradient-to-br from-[#f5f3fb] via-white to-[#eef2ff] dark:from-[#0c0a14] dark:via-[#08070d] dark:to-[#0c0a14] flex items-center justify-center p-4 overflow-hidden"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
+      {/* Decorative background blobs */}
+      <div className="pointer-events-none absolute -top-32 -left-24 w-96 h-96 rounded-full bg-[#5E2CA5]/10 dark:bg-[#5E2CA5]/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-indigo-400/10 dark:bg-indigo-500/10 blur-3xl" />
+
       <div className="relative z-10 w-full max-w-md">
         {/* Card */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg p-8">

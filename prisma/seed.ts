@@ -124,6 +124,25 @@ async function main() {
   });
   console.log("✅ Sozlamalar yaratildi");
 
+  // Kanban stages — the board renders nothing at all when this table is empty.
+  const stages = [
+    { name: "Yangi", color: "#6366f1", order: 0, status: "NEW" as const },
+    { name: "Bog'landi", color: "#3b82f6", order: 1, status: "CONTACTED" as const },
+    { name: "Qiziqdi", color: "#06b6d4", order: 2, status: "INTERESTED" as const },
+    { name: "Sinov bron", color: "#f59e0b", order: 3, status: "TRIAL_BOOKED" as const },
+    { name: "Sinov o'tdi", color: "#f97316", order: 4, status: "TRIAL_COMPLETED" as const },
+    { name: "Yozildi", color: "#10b981", order: 5, status: "ENROLLED" as const, isWon: true },
+    { name: "Kechiktirildi", color: "#eab308", order: 6, status: "POSTPONED" as const },
+    { name: "Yo'qotildi", color: "#ef4444", order: 7, status: "LOST" as const, isLost: true },
+  ];
+  const stageByStatus: Record<string, string> = {};
+  for (const { name, color, order, status, isWon, isLost } of stages) {
+    let stage = await prisma.stage.findFirst({ where: { name } });
+    if (!stage) stage = await prisma.stage.create({ data: { name, color, order, isWon: !!isWon, isLost: !!isLost } });
+    stageByStatus[status] = stage.id;
+  }
+  console.log("✅ Kanban ustunlari yaratildi");
+
   // Sample leads
   const allCourses = await prisma.course.findMany();
   const allSlots = await prisma.timeSlot.findMany();
@@ -155,6 +174,7 @@ async function main() {
           createdById: admin.id,
           notes: `Namuna lid #${i+1}`,
           enrolledAt: lead.status === "ENROLLED" ? new Date() : null,
+          stageId: stageByStatus[lead.status],
         },
       });
       await prisma.activity.create({

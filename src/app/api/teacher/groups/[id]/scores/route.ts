@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
-import { getTeacherGroupIds } from "@/lib/teacher";
+import { getTeacherGroupIds, canGradeGroup } from "@/lib/teacher";
 import { canManageGrades } from "@/lib/permissions";
 
 async function assertOwnsGroup(userId: string, role: string, groupId: string) {
@@ -61,7 +61,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!canManageGrades(session.user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id: groupId } = await params;
-  if (!(await assertOwnsGroup(session.user.id, session.user.role, groupId))) {
+  // Rating changes are scoped to the group's own teacher (or a staff member explicitly
+  // delegated grading) — unlike assertOwnsGroup, admins get no blanket bypass here.
+  if (!(await canGradeGroup(session.user, groupId))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

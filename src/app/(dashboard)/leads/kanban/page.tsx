@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -37,6 +37,41 @@ export default function KanbanPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState<Stage | null>(null);
 
+  // Auto-scroll the board horizontally while dragging a card near its left/right edge —
+  // @hello-pangea/dnd only auto-scrolls the window or a Droppable's own internal scroll
+  // container, not an arbitrary scrollable ancestor like the row of columns here.
+  const boardRef = useRef<HTMLDivElement>(null);
+  const scrollDirRef = useRef(0);
+  const scrollFrameRef = useRef<number | null>(null);
+  const EDGE = 100, SPEED = 14;
+
+  const scrollStep = useCallback(() => {
+    const el = boardRef.current;
+    if (el && scrollDirRef.current !== 0) el.scrollLeft += scrollDirRef.current * SPEED;
+    scrollFrameRef.current = requestAnimationFrame(scrollStep);
+  }, []);
+
+  const handleDragPointerMove = useCallback((e: MouseEvent) => {
+    const el = boardRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (e.clientX < rect.left + EDGE) scrollDirRef.current = -1;
+    else if (e.clientX > rect.right - EDGE) scrollDirRef.current = 1;
+    else scrollDirRef.current = 0;
+  }, []);
+
+  const onDragStart = useCallback(() => {
+    scrollDirRef.current = 0;
+    document.addEventListener("mousemove", handleDragPointerMove);
+    scrollFrameRef.current = requestAnimationFrame(scrollStep);
+  }, [handleDragPointerMove, scrollStep]);
+
+  const stopAutoScroll = useCallback(() => {
+    scrollDirRef.current = 0;
+    document.removeEventListener("mousemove", handleDragPointerMove);
+    if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+  }, [handleDragPointerMove]);
+
   useEffect(() => {
     try { const s = localStorage.getItem("kanbanCollapsed"); if (s) setCollapsed(new Set(JSON.parse(s))); } catch {}
   }, []);
@@ -68,6 +103,7 @@ export default function KanbanPage() {
   useEffect(() => { load(); }, []);
 
   const onDragEnd = async (result: DropResult) => {
+    stopAutoScroll();
     const { source, destination, draggableId } = result;
     if (!destination || (source.droppableId === destination.droppableId && source.index === destination.index)) return;
     const srcCol = source.droppableId, dstCol = destination.droppableId;
@@ -190,8 +226,8 @@ export default function KanbanPage() {
       </div>
 
       {/* Board */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-6 items-start">
+      <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div ref={boardRef} className="flex gap-4 overflow-x-auto pb-6 items-start">
 
           {stages.map((stage, index) => {
             const items = board[stage.id] || [];

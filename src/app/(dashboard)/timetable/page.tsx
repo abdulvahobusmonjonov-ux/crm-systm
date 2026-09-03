@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Plus, Download, LayoutGrid, DoorOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -284,21 +285,25 @@ export default function TimetablePage() {
                                 const color = g.course?.color || "#6366f1";
                                 const count = g._count?.leads ?? 0;
                                 return (
-                                  <div
+                                  <Link
                                     key={g.id}
-                                    title={g.teacher ? g.teacher.fullName : undefined}
-                                    className="rounded-lg px-2.5 py-1.5 text-xs"
+                                    href={`/teacher/groups/${g.id}`}
+                                    title={g.teacher ? `O'qituvchi: ${g.teacher.fullName}` : undefined}
+                                    className="block rounded-lg px-2.5 py-1.5 text-xs hover:brightness-95 dark:hover:brightness-125 transition-[filter] cursor-pointer"
                                     style={{ backgroundColor: hexAlpha(color, "17"), borderLeft: `3px solid ${color}` }}
                                   >
                                     <p className="font-semibold truncate" style={{ color }}>
                                       {g.name}{g.room ? ` / ${g.room}` : ""}
                                     </p>
+                                    {g.teacher && (
+                                      <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{g.teacher.fullName}</p>
+                                    )}
                                     {(g.timeFrom || g.timeTo || count > 0) && (
                                       <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                                         {g.timeFrom}{g.timeTo ? `–${g.timeTo}` : ""}{count > 0 ? ` · ${count} o'quvchi` : ""}
                                       </p>
                                     )}
-                                  </div>
+                                  </Link>
                                 );
                               })}
                             </div>
@@ -356,9 +361,10 @@ export default function TimetablePage() {
                                 const color = g.course?.color || "#6366f1";
                                 const count = g._count?.leads ?? 0;
                                 return (
-                                  <div
+                                  <Link
                                     key={g.id}
-                                    className="rounded-lg px-2.5 py-1.5 text-xs"
+                                    href={`/teacher/groups/${g.id}`}
+                                    className="block rounded-lg px-2.5 py-1.5 text-xs hover:brightness-95 dark:hover:brightness-125 transition-[filter] cursor-pointer"
                                     style={{ backgroundColor: hexAlpha(color, "17"), borderLeft: `3px solid ${color}` }}
                                   >
                                     <p className="font-semibold truncate" style={{ color }}>
@@ -370,7 +376,7 @@ export default function TimetablePage() {
                                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
                                       {g.timeFrom}{g.timeTo ? `–${g.timeTo}` : ""} · {count} o&apos;quvchi
                                     </p>
-                                  </div>
+                                  </Link>
                                 );
                               })}
                             </div>

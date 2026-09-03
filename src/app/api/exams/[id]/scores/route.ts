@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import { hasPermission } from "@/lib/rbac";
+import { canGradeGroup } from "@/lib/teacher";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const user = session.user;
-  const isAdminRole = ["SUPER_ADMIN", "ADMIN"].includes(user.role);
-  const canAdd = isAdminRole || user.canManageGrades || await hasPermission(user, "grades", "add");
+  const canAdd = user.canManageGrades || await hasPermission(user, "grades", "add");
   if (!canAdd) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
+
+  // Rating changes are scoped to the exam's own assigned teacher (or a staff member
+  // explicitly delegated grading) — admins get no blanket bypass here.
+  const exam = await db.exam.findUnique({ where: { id }, select: { groupId: true } });
+  if (!exam) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!exam.groupId || !(await canGradeGroup(user, exam.groupId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await req.json();
   const parsed = schema.safeParse(body);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
   Users, TrendingUp, TrendingDown, Bell, GraduationCap,
@@ -50,6 +51,7 @@ interface KpiCardDef {
   delta?: number;
   deltaLabel?: string;
   staticBadge?: string;
+  href: string;
 }
 
 function fmtAmount(n: number) {
@@ -105,6 +107,7 @@ const DashboardCharts = dynamic(() => import("./DashboardCharts"), {
 });
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -135,6 +138,9 @@ export default function DashboardPage() {
 
   const { kpis } = data;
 
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + "01";
+
   const kpiCards: KpiCardDef[] = [
     {
       label: "Yangi lidlar (bu oy)",
@@ -144,6 +150,7 @@ export default function DashboardPage() {
       chipColor: "text-[#5E2CA5]",
       delta: kpis.leadsThisMonth - kpis.leadsLastMonth,
       deltaLabel: "vs oy",
+      href: `/leads?dateFrom=${monthStart}`,
     },
     {
       label: "Bu oy yozilganlar",
@@ -154,6 +161,7 @@ export default function DashboardPage() {
       chipColor: "text-emerald-600 dark:text-emerald-400",
       delta: kpis.enrolledThisMonth - kpis.enrolledLastMonth,
       deltaLabel: "vs oy",
+      href: "/students",
     },
     {
       label: "Bugungi yangi lidlar",
@@ -163,6 +171,7 @@ export default function DashboardPage() {
       chipColor: "text-amber-600 dark:text-amber-400",
       delta: kpis.todayLeads - kpis.yesterdayLeads,
       deltaLabel: "vs kecha",
+      href: `/leads?dateFrom=${today}&dateTo=${today}`,
     },
     {
       label: "Bugungi qo'ng'iroqlar",
@@ -172,6 +181,7 @@ export default function DashboardPage() {
       chipColor: "text-sky-600 dark:text-sky-400",
       delta: kpis.todayReminders - kpis.yesterdayReminders,
       deltaLabel: "vs kecha",
+      href: "/reminders",
     },
     {
       label: "Sinov darsida",
@@ -182,6 +192,7 @@ export default function DashboardPage() {
       chipColor: "text-violet-600 dark:text-violet-400",
       delta: kpis.trialBookedThisMonth - kpis.trialBookedLastMonth,
       deltaLabel: "vs oy",
+      href: "/leads?status=TRIAL_BOOKED",
     },
     {
       label: "Shu oy to'laganlar",
@@ -192,6 +203,7 @@ export default function DashboardPage() {
       chipColor: "text-green-600 dark:text-green-400",
       delta: kpis.paidThisMonth - kpis.paidLastMonth,
       deltaLabel: "vs oy",
+      href: "/payments",
     },
     {
       label: "Muzlatilganlar",
@@ -200,6 +212,7 @@ export default function DashboardPage() {
       chipBg: "bg-cyan-500/10 dark:bg-cyan-500/20",
       chipColor: "text-cyan-600 dark:text-cyan-400",
       staticBadge: "Hozirgi holat",
+      href: "/leads?frozen=1",
     },
     {
       label: "Qarzdorlar (bu oy)",
@@ -208,6 +221,7 @@ export default function DashboardPage() {
       chipBg: "bg-red-500/10 dark:bg-red-500/20",
       chipColor: "text-red-600 dark:text-red-400",
       staticBadge: "To'lamagan",
+      href: "/debtors",
     },
   ];
 
@@ -223,7 +237,11 @@ export default function DashboardPage() {
         {kpiCards.map(kpi => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col gap-3">
+            <button
+              key={kpi.label}
+              onClick={() => router.push(kpi.href)}
+              className="text-left bg-white dark:bg-gray-900 rounded-2xl shadow-sm hover:shadow-md hover:ring-2 hover:ring-[#5E2CA5]/20 transition-all p-4 sm:p-5 flex flex-col gap-3"
+            >
               <div className="flex items-start justify-between gap-1">
                 <div className={cn("w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0", kpi.chipBg)}>
                   <Icon className={cn("w-4 h-4 sm:w-5 sm:h-5", kpi.chipColor)} />
@@ -242,7 +260,7 @@ export default function DashboardPage() {
                 )}
                 <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 mt-1.5 leading-tight">{kpi.label}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, GraduationCap, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getInitials, formatDate, formatPhone, phoneToTel } from "@/lib/utils";
 
@@ -80,6 +80,13 @@ export default function StudentsPage() {
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Ro&apos;yxatga olingan o&apos;quvchilar</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/leads/new?status=ENROLLED"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#5E2CA5] hover:bg-[#4a2280] text-white text-[13px] font-medium rounded-xl transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            Yangi talaba
+          </Link>
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input

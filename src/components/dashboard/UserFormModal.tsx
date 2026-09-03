@@ -239,6 +239,12 @@ export default function UserFormModal({ user, onClose, onSuccess }: Props) {
               <option value="ADMIN">Admin</option>
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
+            {watch("role") === "MENTOR" && (
+              <p className="mt-1.5 text-[12px] text-gray-400">
+                Bu hodim guruh(lar)ga o&apos;qituvchi sifatida biriktirilgach (Guruhlar sahifasida), o&apos;z o&apos;quvchilarini,
+                davomat va reyting ma&apos;lumotlarini o&apos;z panelida ko&apos;radi.
+              </p>
+            )}
           </div>
 
           {/* Permissions */}

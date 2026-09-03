@@ -36,14 +36,31 @@ function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).pad
 
 const inputCls =
   "w-full px-3 py-2 text-[13px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5E2CA5]/30 focus:border-[#5E2CA5]/50 transition";
+const selectCls = "px-3 py-2 text-[13px] border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#5E2CA5]/30 focus:border-[#5E2CA5]/50 transition";
 
 const TH = "px-4 py-3 text-left text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide whitespace-nowrap";
+
+type PeriodType = "" | "day" | "month" | "year";
+
+// Inclusive [from, to] ISO bounds (UTC day boundaries) for the chosen period picker value.
+function periodRange(type: PeriodType, value: string): { from: string; to: string } {
+  if (!type || !value) return { from: "", to: "" };
+  if (type === "day") return { from: `${value}T00:00:00.000Z`, to: `${value}T23:59:59.999Z` };
+  if (type === "month") {
+    const [y, m] = value.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return { from: `${value}-01T00:00:00.000Z`, to: `${value}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z` };
+  }
+  if (type === "year") return { from: `${value}-01-01T00:00:00.000Z`, to: `${value}-12-31T23:59:59.999Z` };
+  return { from: "", to: "" };
+}
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [summary, setSummary] = useState<PaymentSummary>({ total: 0, count: 0, monthTotal: 0, month: "" });
   const [q, setQ] = useState("");
-  const [month, setMonth] = useState("");
+  const [periodType, setPeriodType] = useState<PeriodType>("");
+  const [periodValue, setPeriodValue] = useState("");
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -58,7 +75,9 @@ export default function PaymentsPage() {
     setLoading(true);
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    if (month) params.set("month", month);
+    const { from, to } = periodRange(periodType, periodValue);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
     params.set("page", String(page));
     const res = await fetch("/api/payments?" + params.toString());
     const data = await res.json();
@@ -67,12 +86,14 @@ export default function PaymentsPage() {
     setTotal(data.total || 0);
     setPages(data.pages || 1);
     setLoading(false);
-  }, [q, month, page]);
+  }, [q, periodType, periodValue, page]);
 
   useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [load]);
 
   const setFilterQ = (v: string) => { setQ(v); setPage(1); };
-  const setFilterMonth = (v: string) => { setMonth(v); setPage(1); };
+  const setFilterPeriodType = (v: PeriodType) => { setPeriodType(v); setPeriodValue(""); setPage(1); };
+  const setFilterPeriodValue = (v: string) => { setPeriodValue(v); setPage(1); };
+  const clearPeriod = () => { setPeriodType(""); setPeriodValue(""); setPage(1); };
 
   const loadDebtors = useCallback(async () => {
     const params = new URLSearchParams({ month: debtMonth });
@@ -94,7 +115,9 @@ export default function PaymentsPage() {
   const exportPayments = async () => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    if (month) params.set("month", month);
+    const { from, to } = periodRange(periodType, periodValue);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
     params.set("limit", "100000");
     const res = await fetch("/api/payments?" + params.toString());
     const data = await res.json();
@@ -123,7 +146,7 @@ export default function PaymentsPage() {
       chip: "bg-emerald-500/10 text-emerald-600",
     },
     {
-      label: "Jami tushum",
+      label: periodType ? "Tanlangan davr tushumi" : "Jami tushum",
       value: `${money(summary.total)} so'm`,
       icon: Wallet,
       chip: "bg-[#5E2CA5]/10 text-[#5E2CA5]",
@@ -213,12 +236,39 @@ export default function PaymentsPage() {
                 className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5E2CA5]/30 focus:border-[#5E2CA5]/50 transition"
               />
             </div>
-            <MonthPicker
-              value={month} onChange={e => setFilterMonth(e.target.value)}
-              className="px-3 py-2 text-[13px]"
-            />
-            {month && (
-              <button onClick={() => setFilterMonth("")} className="px-3 py-2 text-[13px] font-medium text-gray-500 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+            <select
+              value={periodType}
+              onChange={e => setFilterPeriodType(e.target.value as PeriodType)}
+              className={selectCls}
+            >
+              <option value="">Barcha vaqt</option>
+              <option value="day">Kunlik</option>
+              <option value="month">Oylik</option>
+              <option value="year">Yillik</option>
+            </select>
+            {periodType === "day" && (
+              <input
+                type="date" value={periodValue}
+                onChange={e => setFilterPeriodValue(e.target.value)}
+                className={selectCls}
+              />
+            )}
+            {periodType === "month" && (
+              <MonthPicker
+                value={periodValue} onChange={e => setFilterPeriodValue(e.target.value)}
+                className="px-3 py-2 text-[13px]"
+              />
+            )}
+            {periodType === "year" && (
+              <select value={periodValue} onChange={e => setFilterPeriodValue(e.target.value)} className={selectCls}>
+                <option value="">Yilni tanlang</option>
+                {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+            )}
+            {periodType && (
+              <button onClick={clearPeriod} className="px-3 py-2 text-[13px] font-medium text-gray-500 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                 Tozalash
               </button>
             )}
