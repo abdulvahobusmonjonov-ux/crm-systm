@@ -3,16 +3,21 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Save, Users2, Wallet, Star, Phone, BookOpen, GraduationCap,
+  Plus, Save, Users2, Wallet, Star, Phone, BookOpen, GraduationCap, Gift,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Modal, ModalPrimaryButton, ModalSecondaryButton } from "@/components/ui/modal";
 import { cn, formatPhone, getInitials } from "@/lib/utils";
 
 interface Teacher {
   id: string; fullName: string; username: string; role: string;
-  subject: string; salary: number; phone?: string;
+  subject: string; salary: number; phone?: string; rating: number;
   groupsCount: number; studentsCount: number; groups: string[];
 }
+
+function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
+// A simple, transparent scale: 100,000 so'm per star — admin sees and can edit the amount before saving.
+const BONUS_PER_STAR = 100000;
 
 const BRAND = "#5E2CA5";
 
@@ -23,15 +28,6 @@ const SUBJECT_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#3b82f6", "
 
 function nameColor(name: string, palette: string[]): string {
   return palette[(name.charCodeAt(0) + (name.charCodeAt(1) || 0)) % palette.length];
-}
-
-function starsFromCount(n: number): number {
-  if (n === 0) return 0;
-  if (n <= 10) return 1;
-  if (n <= 20) return 2;
-  if (n <= 30) return 3;
-  if (n <= 40) return 4;
-  return 5;
 }
 
 const fieldCls =
@@ -45,6 +41,10 @@ export default function TeachersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newForm, setNewForm] = useState({ fullName: "", username: "", password: "" });
+  const [bonusFor, setBonusFor] = useState<Teacher | null>(null);
+  const [bonusAmount, setBonusAmount] = useState("");
+  const [bonusNote, setBonusNote] = useState("");
+  const [savingBonus, setSavingBonus] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -67,6 +67,36 @@ export default function TeachersPage() {
     });
     if (res.ok) { toast.success("Saqlandi"); load(); }
     else toast.error("Saqlab bo'lmadi (faqat admin)");
+  };
+
+  const rate = async (t: Teacher, stars: number) => {
+    const res = await fetch(`/api/teachers/${t.id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating: stars }),
+    });
+    if (res.ok) {
+      setTeachers((prev) => prev.map((x) => (x.id === t.id ? { ...x, rating: stars } : x)));
+      toast.success(`${t.fullName}: ${stars} yulduz`);
+    } else toast.error("Saqlab bo'lmadi (faqat admin)");
+  };
+
+  const openBonus = (t: Teacher) => {
+    setBonusFor(t);
+    setBonusAmount(String(t.rating * BONUS_PER_STAR || ""));
+    setBonusNote(t.rating ? `Reyting bo'yicha bonus (${t.rating}⭐)` : "");
+  };
+
+  const saveBonus = async () => {
+    if (!bonusFor) return;
+    if (!bonusAmount || Number(bonusAmount) <= 0) { toast.error("Summani kiriting"); return; }
+    setSavingBonus(true);
+    const res = await fetch("/api/payroll", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: bonusFor.id, amount: bonusAmount, note: bonusNote, month: ym(new Date()), type: "bonus" }),
+    });
+    setSavingBonus(false);
+    if (res.ok) { toast.success("Bonus berildi"); setBonusFor(null); }
+    else toast.error("Saqlab bo'lmadi");
   };
 
   const createTeacher = async () => {
@@ -159,7 +189,7 @@ export default function TeachersPage() {
           {teachers.map((t) => {
             const avatarColor = nameColor(t.fullName, AVATAR_COLORS);
             const subColor = t.subject ? nameColor(t.subject, SUBJECT_COLORS) : "#94a3b8";
-            const stars = starsFromCount(t.studentsCount);
+            const stars = t.rating;
             const currentSubject = edits[t.id]?.subject ?? t.subject;
             const currentSalary = edits[t.id]?.salary ?? String(t.salary || "");
             const isDirty = edits[t.id] !== undefined;
@@ -197,15 +227,21 @@ export default function TeachersPage() {
                       <p className="text-[11px] text-gray-400 mt-0.5 font-mono">@{t.username}</p>
                     </div>
 
-                    {/* Star rating */}
-                    <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5">
+                    {/* Star rating — click a star to set this teacher's rating */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5" title="Reytingni belgilash">
                       {[1, 2, 3, 4, 5].map(s => (
-                        <Star
+                        <button
                           key={s}
-                          className="w-3.5 h-3.5"
-                          fill={s <= stars ? "#f59e0b" : "none"}
-                          stroke={s <= stars ? "#f59e0b" : "#d1d5db"}
-                        />
+                          type="button"
+                          onClick={() => rate(t, s === stars ? 0 : s)}
+                          className="p-0.5 -m-0.5 hover:scale-110 transition-transform"
+                        >
+                          <Star
+                            className="w-3.5 h-3.5"
+                            fill={s <= stars ? "#f59e0b" : "none"}
+                            stroke={s <= stars ? "#f59e0b" : "#d1d5db"}
+                          />
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -273,17 +309,26 @@ export default function TeachersPage() {
                         Telefon yo&apos;q
                       </span>
                     )}
-                    <button
-                      onClick={() => save(t)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
-                        isDirty
-                          ? "bg-[#5E2CA5] text-white hover:bg-[#4a2280]"
-                          : "bg-gray-100 dark:bg-white/8 text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15"
-                      )}
-                    >
-                      <Save className="w-3.5 h-3.5" /> Saqlash
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openBonus(t)}
+                        title="Reytingga yarasha bonus berish"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                      >
+                        <Gift className="w-3.5 h-3.5" /> Bonus
+                      </button>
+                      <button
+                        onClick={() => save(t)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors",
+                          isDirty
+                            ? "bg-[#5E2CA5] text-white hover:bg-[#4a2280]"
+                            : "bg-gray-100 dark:bg-white/8 text-gray-400 hover:bg-gray-200 dark:hover:bg-white/15"
+                        )}
+                      >
+                        <Save className="w-3.5 h-3.5" /> Saqlash
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -334,6 +379,36 @@ export default function TeachersPage() {
               />
             </div>
 
+        </Modal>
+      )}
+
+      {/* Bonus modal */}
+      {bonusFor && (
+        <Modal
+          title={`Bonus berish — ${bonusFor.fullName}`}
+          maxWidth="max-w-sm"
+          onClose={() => setBonusFor(null)}
+          footer={
+            <>
+              <ModalPrimaryButton onClick={saveBonus} loading={savingBonus}>Berish</ModalPrimaryButton>
+              <ModalSecondaryButton onClick={() => setBonusFor(null)}>Bekor qilish</ModalSecondaryButton>
+            </>
+          }
+        >
+          <p className="text-[12px] text-gray-400">
+            Joriy reyting: {"⭐".repeat(bonusFor.rating) || "belgilanmagan"} — taklif etilgan summa reytingga
+            ({BONUS_PER_STAR.toLocaleString("ru-RU")} so&apos;m / yulduz) qarab hisoblandi, xohlasangiz o&apos;zgartiring.
+          </p>
+          <Input label="Summa (so'm)" type="number" value={bonusAmount} onChange={e => setBonusAmount(e.target.value)} placeholder="500000" />
+          <div>
+            <label className={labelCls}>Sabab / izoh</label>
+            <input
+              value={bonusNote}
+              onChange={e => setBonusNote(e.target.value)}
+              placeholder="Masalan: Reyting bo'yicha bonus"
+              className={fieldCls}
+            />
+          </div>
         </Modal>
       )}
     </div>

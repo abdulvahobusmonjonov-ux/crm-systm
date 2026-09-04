@@ -12,6 +12,7 @@ export async function GET() {
     where: { isActive: true },
     select: {
       id: true, fullName: true, username: true, role: true, salary: true, subject: true,
+      phone: true, rating: true,
       groupsTeaching: { select: { id: true, name: true, _count: { select: { leads: true } } } },
     },
     orderBy: { fullName: "asc" },
@@ -24,6 +25,8 @@ export async function GET() {
     role: u.role,
     subject: u.subject || "",
     salary: u.salary ? Number(u.salary) : 0,
+    phone: u.phone || undefined,
+    rating: u.rating,
     groupsCount: u.groupsTeaching.length,
     studentsCount: u.groupsTeaching.reduce((a, g) => a + g._count.leads, 0),
     groups: u.groupsTeaching.map((g) => g.name),

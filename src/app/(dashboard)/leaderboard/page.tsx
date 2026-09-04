@@ -1,18 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Trophy } from "lucide-react";
+import { toast } from "sonner";
+import { Trophy, Gift } from "lucide-react";
+import { Modal, ModalPrimaryButton, ModalSecondaryButton } from "@/components/ui/modal";
 import { cn, getInitials } from "@/lib/utils";
 
 const BRAND = "#5E2CA5";
 
-type Period = "week" | "month" | "all";
+type Period = "week" | "month" | "year" | "all";
 
 const PERIODS: { key: Period; label: string }[] = [
   { key: "week",  label: "Hafta"   },
   { key: "month", label: "Oy"      },
+  { key: "year",  label: "Yil"     },
   { key: "all",   label: "Hammasi" },
 ];
+
+const PERIOD_PRIZE_NOTE: Record<Period, string> = {
+  week: "Haftalik reyting sovrini",
+  month: "Oylik reyting sovrini",
+  year: "Yillik reyting sovrini",
+  all: "Reyting sovrini",
+};
+
+const fieldCls =
+  "w-full px-3 py-2 text-[13px] border border-gray-200 dark:border-white/10 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5E2CA5]/30 focus:border-[#5E2CA5]/50 transition";
+const labelCls = "block text-[11px] font-medium text-gray-400 dark:text-gray-500 mb-1.5";
 
 const MEDAL = [
   { border: "#f59e0b", bg: "#fef3c7", text: "#92400e", label: "🥇", shadow: "shadow-amber-200 dark:shadow-amber-900/40"  },
@@ -42,13 +56,35 @@ export default function LeaderboardPage() {
   const [list, setList] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>("all");
+  const [prizeFor, setPrizeFor] = useState<LeaderboardEntry | null>(null);
+  const [prizeAmount, setPrizeAmount] = useState("");
+  const [savingPrize, setSavingPrize] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
     fetch(`/api/leaderboard?period=${period}`)
       .then(r => r.json())
       .then(d => { setList(Array.isArray(d) ? d : []); setLoading(false); });
-  }, [period]);
+  };
+  useEffect(load, [period]);
+
+  const openPrize = (student: LeaderboardEntry) => {
+    setPrizeFor(student);
+    setPrizeAmount("50");
+  };
+
+  const savePrize = async () => {
+    if (!prizeFor) return;
+    if (!prizeAmount || Number(prizeAmount) <= 0) { toast.error("Tanga sonini kiriting"); return; }
+    setSavingPrize(true);
+    const res = await fetch(`/api/leads/${prizeFor.id}/coins`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: Number(prizeAmount), reason: PERIOD_PRIZE_NOTE[period] }),
+    });
+    setSavingPrize(false);
+    if (res.ok) { toast.success(`${prizeFor.fullName} ga sovrin berildi`); setPrizeFor(null); load(); }
+    else toast.error("Berib bo'lmadi");
+  };
 
   const top3   = list.slice(0, 3);
   const rest   = list.slice(3, 10);
@@ -170,6 +206,13 @@ export default function LeaderboardPage() {
                         </span>
                       </div>
                     </div>
+
+                    <button
+                      onClick={() => openPrize(student)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                    >
+                      <Gift className="w-3 h-3" /> Sovrin
+                    </button>
                   </div>
                 );
               })}
@@ -229,6 +272,14 @@ export default function LeaderboardPage() {
                           {student.coins ?? 0}
                         </span>
                       </div>
+
+                      <button
+                        onClick={() => openPrize(student)}
+                        title="Sovrin berish"
+                        className="flex-shrink-0 p-1.5 rounded-lg text-gray-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"
+                      >
+                        <Gift className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   );
                 })}
@@ -243,6 +294,32 @@ export default function LeaderboardPage() {
             </p>
           )}
         </>
+      )}
+
+      {/* Prize modal */}
+      {prizeFor && (
+        <Modal
+          title={`Sovrin berish — ${prizeFor.fullName}`}
+          maxWidth="max-w-sm"
+          onClose={() => setPrizeFor(null)}
+          footer={
+            <>
+              <ModalPrimaryButton onClick={savePrize} loading={savingPrize}>Berish</ModalPrimaryButton>
+              <ModalSecondaryButton onClick={() => setPrizeFor(null)}>Bekor qilish</ModalSecondaryButton>
+            </>
+          }
+        >
+          <p className="text-[12px] text-gray-400">
+            {PERIOD_PRIZE_NOTE[period]} sifatida qo&apos;shimcha tanga beriladi.
+          </p>
+          <div>
+            <label className={labelCls}>Tanga soni</label>
+            <input
+              type="number" value={prizeAmount} onChange={e => setPrizeAmount(e.target.value)}
+              placeholder="50" className={fieldCls}
+            />
+          </div>
+        </Modal>
       )}
     </div>
   );
