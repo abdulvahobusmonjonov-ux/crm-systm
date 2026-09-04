@@ -49,7 +49,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       course: true,
       timeSlot: true,
       stage: true,
-      group: { select: { id: true, name: true, days: true, timeFrom: true, timeTo: true } },
+      group: {
+        select: {
+          id: true, name: true, days: true, timeFrom: true, timeTo: true, room: true, startDate: true,
+          teacher: { select: { id: true, fullName: true } },
+        },
+      },
       assignedTo: { select: { id: true, fullName: true, username: true } },
       createdBy: { select: { id: true, fullName: true } },
       tags: true,

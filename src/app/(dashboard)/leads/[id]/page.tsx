@@ -7,13 +7,13 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Phone, MessageCircle, Edit, Trash2, Bell, Pin, PinOff,
   User, BookOpen, Activity, Check, X, Coins, Send, CalendarCheck,
-  Wallet, GraduationCap, Plus, Minus,
+  Wallet, GraduationCap, Plus, Minus, Users2, MapPin, Clock,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { useConfirm } from "@/components/ui/confirm";
-import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, LEAD_SOURCE_LABELS } from "@/lib/constants";
+import { LEAD_STATUS_LABELS, LEAD_STATUS_COLORS, LEAD_SOURCE_LABELS, WEEKDAYS } from "@/lib/constants";
 import { formatDate, formatDateTime, formatRelativeTime, formatPhone, phoneToTel, phoneToTelegram, phoneToWhatsapp, formatCurrency, getInitials, isPhoneComplete } from "@/lib/utils";
 
 interface LeadPayment { id: string; amount: string | number; paidAt: string; forMonth: string | null; }
@@ -27,7 +27,7 @@ interface Lead {
   parentName: string | null; parentPhone: string | null; telegramChatId: string | null;
   status: string; source: string; sourceDetails: string | null; notes: string | null;
   payments?: LeadPayment[]; attendances?: { status: string }[];
-  coins?: number; scores?: LeadScore[];
+  coins?: number; scores?: LeadScore[]; discountPercent?: number; birthDate?: string | null;
   frozenAt?: string | null; isArchived?: boolean;
   timePreference: string; preferredDays: string | null; lessonTime: string | null; isPinned: boolean;
   trialDate: string | null; enrolledAt: string | null; lastContactedAt: string | null;
@@ -36,6 +36,10 @@ interface Lead {
   timeSlot: { id: string; label: string } | null;
   stageId: string | null;
   stage: { id: string; name: string; color: string } | null;
+  group: {
+    id: string; name: string; days: string | null; timeFrom: string | null; timeTo: string | null;
+    room: string | null; startDate: string | null; teacher: { id: string; fullName: string } | null;
+  } | null;
   assignedTo: { id: string; fullName: string; username: string } | null;
   createdBy: { id: string; fullName: string };
   tags: { id: string; name: string; color: string }[];
@@ -47,7 +51,9 @@ interface CourseOption { id: string; name: string; }
 interface UserOption { id: string; fullName: string; }
 interface StageOption { id: string; name: string; }
 
-type Tab = "activity" | "reminders" | "payments" | "attendance" | "scores";
+type Tab = "groups" | "activity" | "reminders" | "payments" | "attendance" | "scores";
+
+function dayLabel(v: string) { return WEEKDAYS.find((d) => d.value === v)?.label ?? v; }
 
 const ACTIVITY_DOT: Record<string, string> = {
   lead_created: "bg-emerald-500",
@@ -63,7 +69,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("activity");
+  const [tab, setTab] = useState<Tab>("groups");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState<Record<string, unknown>>({});
@@ -186,6 +192,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
   const currentStageIdx = stages.findIndex((s)=>s.id===lead.stageId);
   const total = (lead.payments || []).reduce((a: number, p) => a + Number(p.amount || 0), 0);
+  const required = lead.course ? Number(lead.course.price) * (1 - (lead.discountPercent || 0) / 100) : 0;
+  const balance = total - required;
   const att = lead.attendances || [];
   const present = att.filter((a) => a.status === "present").length;
   const absent = att.filter((a) => a.status === "absent").length;
@@ -194,6 +202,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const statusCls = LEAD_STATUS_COLORS[lead.status as keyof typeof LEAD_STATUS_COLORS] || "";
 
   const tabs: { key: Tab; label: string; icon: typeof Activity; badge?: number }[] = [
+    { key: "groups", label: "Guruhlar", icon: Users2 },
     { key: "activity", label: "Faoliyat", icon: Activity },
     { key: "reminders", label: "Eslatmalar", icon: Bell, badge: lead.reminders.filter((r)=>r.status==="PENDING").length },
     { key: "payments", label: "To'lovlar", icon: Wallet },
@@ -231,6 +240,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                 {lead.frozenAt && <span className="text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 px-2 py-0.5 rounded-full">❄️ Muzlatilgan</span>}
                 {lead.isArchived && <span className="text-xs font-medium bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400 px-2 py-0.5 rounded-full">🗄 Arxiv</span>}
               </div>
+
+              {lead.course && (
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${balance < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400"}`}>
+                    {balance < 0 ? "-" : "+"}{Math.abs(balance).toLocaleString("ru-RU")} balans (so&apos;m)
+                  </span>
+                  <span className="text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 px-2.5 py-1 rounded-full flex items-center gap-1">
+                    <Coins className="w-3 h-3" /> {lead.coins ?? 0} ta tanga
+                  </span>
+                </div>
+              )}
 
               <div className="flex items-center gap-4 mt-1.5 flex-wrap text-sm">
                 <a href={phoneToTel(lead.phone)} className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-[#5E2CA5] transition">
@@ -303,6 +323,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               {/* Fields */}
               <div className="grid grid-cols-1 gap-3 text-sm pt-1">
                 {[
+                  ["Tug'ilgan sana", null, lead.birthDate ? formatDate(lead.birthDate) : "Mavjud emas"],
                   ["Yoshi", "age", lead.age ? `${lead.age} yosh` : "—"],
                   ["Manzil", "address", lead.address || "—"],
                   ["Ota-ona ismi", "parentName", lead.parentName || "—"],
@@ -408,6 +429,80 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               })}
             </div>
             <CardContent>
+              {tab === "groups" && (
+                <div className="space-y-4">
+                  {!lead.group ? (
+                    <p className="text-center text-gray-400 py-8">Hech qanday guruhga biriktirilmagan</p>
+                  ) : (
+                    <div className="rounded-2xl border border-gray-100 dark:border-white/10 overflow-hidden">
+                      <Link
+                        href={`/teacher/groups/${lead.group.id}`}
+                        className="block px-5 py-3 text-center text-sm font-semibold text-[#5E2CA5] dark:text-purple-400 bg-[#5E2CA5]/5 dark:bg-[#5E2CA5]/10 hover:bg-[#5E2CA5]/10 dark:hover:bg-[#5E2CA5]/15 transition-colors"
+                      >
+                        {lead.group.name}
+                      </Link>
+                      <div className="p-5 space-y-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><GraduationCap className="w-3.5 h-3.5" /> O&apos;qituvchi</span>
+                          <span className="font-medium text-[#5E2CA5] dark:text-purple-400 text-right">{lead.group.teacher?.fullName || "—"}</span>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Dars kunlari / vaqti</span>
+                          <span className="font-medium text-gray-900 dark:text-white text-right">
+                            {(lead.group.days || "").split(",").filter(Boolean).map(dayLabel).join(", ") || "—"}
+                            {lead.group.timeFrom && <><br />{lead.group.timeFrom}–{lead.group.timeTo}</>}
+                          </span>
+                        </div>
+                        {lead.group.room && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Xona</span>
+                            <span className="font-medium text-gray-900 dark:text-white text-right">{lead.group.room}</span>
+                          </div>
+                        )}
+                        {lead.course && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> Kursi</span>
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full text-white" style={{ backgroundColor: lead.course.color || "#5E2CA5" }}>{lead.course.name}</span>
+                          </div>
+                        )}
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Holati</span>
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusCls}`}>{LEAD_STATUS_LABELS[lead.status as keyof typeof LEAD_STATUS_LABELS]}</span>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Guruhga qo&apos;shilgan sana</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{formatDate(lead.createdAt)}</span>
+                        </div>
+                        {lead.group.startDate && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Boshlanish sanasi</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{formatDate(lead.group.startDate)}</span>
+                          </div>
+                        )}
+                        {lead.enrolledAt && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Guruhda faollashtirilgan sana</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{formatDate(lead.enrolledAt)}</span>
+                          </div>
+                        )}
+                        {lead.course && (
+                          <div className="flex items-start justify-between gap-3">
+                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Guruh narxi</span>
+                            <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(lead.course.price)}</span>
+                          </div>
+                        )}
+                      </div>
+                      <Link
+                        href={`/teacher/groups/${lead.group.id}`}
+                        className="block px-5 py-3 text-center text-sm font-medium text-teal-600 dark:text-teal-400 border-t border-gray-100 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                      >
+                        Davomat &amp; Baho →
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {tab === "activity" && (
                 <div className="space-y-5">
                   {/* Add comment */}
