@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Bell, Clock, AlertCircle, CalendarClock, Activity } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
@@ -43,6 +44,9 @@ function itemIcon(remindAt: string) {
 type Tab = "reminders" | "logs";
 
 export default function NotificationBell() {
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  const isAdminRole = role === "SUPER_ADMIN" || role === "ADMIN";
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("reminders");
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -67,6 +71,8 @@ export default function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    // /api/logs is admin-only — staff without that role would just get a 403 here.
+    if (!isAdminRole) return;
     async function load() {
       try {
         const res = await fetch("/api/logs");
@@ -79,14 +85,14 @@ export default function NotificationBell() {
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAdminRole]);
 
   const tabs = useMemo(
     () => [
       { key: "reminders" as const, label: "Eslatmalar", count: reminders.length },
-      { key: "logs" as const, label: "Voqealar", count: logs.length },
+      ...(isAdminRole ? [{ key: "logs" as const, label: "Voqealar", count: logs.length }] : []),
     ],
-    [reminders.length, logs.length]
+    [reminders.length, logs.length, isAdminRole]
   );
 
   useEffect(() => {
