@@ -180,9 +180,12 @@ export default function GroupsPage() {
 
                     {/* Name + course */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] font-bold text-gray-900 dark:text-white leading-snug truncate">
+                      <Link
+                        href={`/teacher/groups/${g.id}`}
+                        className="text-[14px] font-bold text-gray-900 dark:text-white leading-snug truncate hover:text-[#5E2CA5] transition-colors block"
+                      >
                         {g.name}
-                      </h3>
+                      </Link>
                       <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5 truncate">
                         {g.course?.name || "Kurs belgilanmagan"}
                       </p>

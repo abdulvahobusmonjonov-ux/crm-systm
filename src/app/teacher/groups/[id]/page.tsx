@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, MapPin, BookOpen } from "lucide-react";
+import { ArrowLeft, MapPin, BookOpen, GraduationCap, CalendarCheck } from "lucide-react";
 import { MonthPicker } from "@/components/ui/date-picker";
 import { cn } from "@/lib/utils";
 import AttendanceTab from "./AttendanceTab";
@@ -11,12 +11,16 @@ import ScoresTab from "./ScoresTab";
 import ExercisesTab from "./ExercisesTab";
 import RankingTab from "./RankingTab";
 import ExamsTab from "./ExamsTab";
+import FinanceTab from "./FinanceTab";
+import MessagesTab from "./MessagesTab";
 
 interface GroupDetail {
   id: string;
   name: string;
   room: string | null;
   course: { name: string } | null;
+  teacher: { id: string; fullName: string } | null;
+  lessonsHeld: number;
   leads: { id: string; fullName: string; phone: string; coins: number }[];
 }
 
@@ -26,6 +30,8 @@ const TABS = [
   { key: "exercises", label: "Mashqlar" },
   { key: "ranking", label: "Reyting" },
   { key: "exams", label: "Imtihonlar" },
+  { key: "finance", label: "Moliya" },
+  { key: "messages", label: "Xabarlar" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -72,9 +78,14 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
             {loading ? "Yuklanmoqda..." : group?.name || "Guruh topilmadi"}
           </h1>
           {group && (
-            <div className="flex items-center gap-3 mt-0.5 text-[13px] text-gray-400 dark:text-gray-500">
+            <div className="flex items-center gap-3 mt-0.5 text-[13px] text-gray-400 dark:text-gray-500 flex-wrap">
               {group.course && <span className="flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />{group.course.name}</span>}
               {group.room && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{group.room}</span>}
+              <span className="flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5" />
+                {group.teacher?.fullName || "O'qituvchi belgilanmagan"}
+              </span>
+              <span className="flex items-center gap-1"><CalendarCheck className="w-3.5 h-3.5" />{group.lessonsHeld} ta dars o&apos;tgan</span>
             </div>
           )}
         </div>
@@ -106,11 +117,13 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
                 </button>
               ))}
             </div>
-            <MonthPicker
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="bg-white dark:bg-gray-900"
-            />
+            {(tab === "attendance" || tab === "scores" || tab === "exercises" || tab === "ranking") && (
+              <MonthPicker
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="bg-white dark:bg-gray-900"
+              />
+            )}
           </div>
 
           {group && (
@@ -120,6 +133,8 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
               {tab === "exercises" && <ExercisesTab groupId={groupId} month={month} />}
               {tab === "ranking" && <RankingTab groupId={groupId} month={month} />}
               {tab === "exams" && <ExamsTab groupId={groupId} />}
+              {tab === "finance" && <FinanceTab groupId={groupId} />}
+              {tab === "messages" && <MessagesTab groupId={groupId} />}
             </>
           )}
         </>

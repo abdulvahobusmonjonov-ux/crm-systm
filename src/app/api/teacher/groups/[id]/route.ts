@@ -23,7 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       days: true,
       timeFrom: true,
       timeTo: true,
-      course: { select: { id: true, name: true, color: true } },
+      course: { select: { id: true, name: true, color: true, price: true } },
+      teacher: { select: { id: true, fullName: true, phone: true } },
       leads: {
         where: { isArchived: false },
         select: { id: true, fullName: true, phone: true, coins: true },
@@ -32,5 +33,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
   });
   if (!group) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(group);
+
+  const lessonDates = await db.attendance.findMany({
+    where: { groupId: id },
+    select: { date: true },
+    distinct: ["date"],
+  });
+
+  return NextResponse.json({ ...group, lessonsHeld: lessonDates.length });
 }
