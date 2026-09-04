@@ -20,7 +20,9 @@ import NotesTab from "./NotesTab";
 type StatusTag = "trial" | "frozen" | "debtor" | "active";
 
 interface StudentRow {
-  id: string; fullName: string; phone: string; coins: number; discountPercent: number; statusTag: StatusTag;
+  id: string; fullName: string; phone: string; phoneSecondary: string | null; parentPhone: string | null;
+  coins: number; discountPercent: number; statusTag: StatusTag; debtAmount: number;
+  nextLessonAt: string | null; createdAt: string; enrolledAt: string | null;
 }
 interface GroupDetail {
   id: string;
@@ -63,10 +65,24 @@ const STATUS_LEGEND: { key: StatusTag; label: string }[] = [
   { key: "active", label: "Faol" },
   { key: "frozen", label: "Muzlatilgan" },
 ];
+const STATUS_LABEL: Record<StatusTag, string> = {
+  debtor: "Qarzdor", trial: "Sinovda", frozen: "Muzlatilgan", active: "Aktiv",
+};
+const STATUS_BADGE: Record<StatusTag, string> = {
+  debtor: "bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400",
+  trial: "bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-400",
+  frozen: "bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  active: "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+};
 
 function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function money(v: number | null) { return Number(v || 0).toLocaleString("ru-RU"); }
 function fmtDate(v: string | null) { return v ? new Date(v).toLocaleDateString("ru-RU") : "—"; }
+function fmtDateTime(v: string | null) {
+  if (!v) return "—";
+  const d = new Date(v);
+  return `${d.toLocaleDateString("ru-RU")}, ${d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+}
 function dayLabel(v: string) { return WEEKDAYS.find((d) => d.value === v)?.label ?? v; }
 
 export default function TeacherGroupPage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +96,7 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<TabKey>("attendance");
   const [month, setMonth] = useState(ym(new Date()));
+  const [hovered, setHovered] = useState<{ student: StudentRow; x: number; y: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,7 +192,7 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
               </div>
             </Card>
 
-            <Card className="overflow-hidden">
+            <Card>
               <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                 <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
                   Talabalar ({group.leads.length})
@@ -196,6 +213,11 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
                   <Link
                     key={s.id}
                     href={`/leads/${s.id}`}
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setHovered({ student: s, x: rect.right + 8, y: rect.top });
+                    }}
+                    onMouseLeave={() => setHovered((h) => (h?.student.id === s.id ? null : h))}
                     className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                   >
                     <span className="w-4 text-[11px] text-gray-300 dark:text-gray-600 flex-shrink-0">{idx + 1}</span>
@@ -245,6 +267,55 @@ export default function TeacherGroupPage({ params }: { params: Promise<{ id: str
             {tab === "exams" && <ExamsTab groupId={groupId} />}
             {tab === "history" && <TarixTab groupId={groupId} />}
             {tab === "notes" && <NotesTab groupId={groupId} initialNotes={group.notes || ""} />}
+          </div>
+        </div>
+      )}
+
+      {/* Hover card — quick student summary, positioned in fixed/viewport space so it
+          can't be clipped by the scrolling roster list's own overflow container. */}
+      {hovered && (
+        <div
+          className="fixed z-50 w-72 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-4 pointer-events-none"
+          style={{ left: hovered.x, top: hovered.y }}
+        >
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-[14px] font-bold text-gray-900 dark:text-white leading-snug">{hovered.student.fullName}</p>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap", STATUS_BADGE[hovered.student.statusTag])}>
+                {STATUS_LABEL[hovered.student.statusTag]}
+              </span>
+              {hovered.student.debtAmount > 0 && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400 whitespace-nowrap">
+                  -{money(hovered.student.debtAmount)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {hovered.student.nextLessonAt && (
+            <div className="mb-3 pb-3 border-b border-gray-100 dark:border-white/5">
+              <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-200">{fmtDateTime(hovered.student.nextLessonAt)}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Keyingi dars</p>
+            </div>
+          )}
+
+          <div className="space-y-2 text-[12px]">
+            <div>
+              <p className="text-gray-400">Ota-ona raqami</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">{hovered.student.parentPhone ? formatPhone(hovered.student.parentPhone) : "Mavjud emas"}</p>
+            </div>
+            <div>
+              <p className="text-gray-400">Qo&apos;shimcha raqam</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">{hovered.student.phoneSecondary ? formatPhone(hovered.student.phoneSecondary) : "Mavjud emas"}</p>
+            </div>
+            <div>
+              <p className="text-gray-400">Talaba guruhga qo&apos;shilgan sana</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">{fmtDateTime(hovered.student.createdAt)}</p>
+            </div>
+            <div>
+              <p className="text-gray-400">Faollashtirilgan</p>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">{fmtDate(hovered.student.enrolledAt)}</p>
+            </div>
           </div>
         </div>
       )}
