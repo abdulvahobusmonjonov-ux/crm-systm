@@ -174,6 +174,7 @@ model Lead {
   referrerName   String?
   referrerPhone  String?
   isArchived     Boolean  @default(false)
+  discountPercent Int     @default(0)
 
   courseId String?
   course   Course?   @relation(fields: [courseId], references: [id])
@@ -455,6 +456,7 @@ model Group {
   timeTo    String?
   room      String?
   startDate DateTime?
+  notes     String?   @db.Text
   isActive  Boolean   @default(true)
   isArchived Boolean  @default(false)
   leads     Lead[]
